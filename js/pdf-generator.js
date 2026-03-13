@@ -265,38 +265,94 @@ const PDFGenerator = (() => {
       format: opts.pageSize,
     });
 
+    const renderWidthPx = _getRenderWidthPx(opts);
+    const parsed = _prepareTemplateForRender(html);
+
     const host = document.createElement('div');
     host.style.position = 'fixed';
-    host.style.left = '-100000px';
+    host.style.left = '0';
     host.style.top = '0';
-    host.style.width = `${_getRenderWidthPx(opts)}px`;
+    host.style.width = `${renderWidthPx}px`;
     host.style.background = '#ffffff';
-    host.innerHTML = html;
+    host.style.opacity = '0';
+    host.style.pointerEvents = 'none';
+    host.style.zIndex = '-1';
+    host.style.overflow = 'visible';
+    host.setAttribute('dir', parsed.dir || 'ltr');
+    host.setAttribute('lang', parsed.lang || 'en');
+
+    const styleTag = parsed.styles ? `<style>${parsed.styles}</style>` : '';
+    host.innerHTML = `${styleTag}${parsed.bodyHtml}`;
     document.body.appendChild(host);
 
     try {
+      await _waitForImages(host);
+
       await new Promise((resolve, reject) => {
+        let settled = false;
+        const done = () => {
+          if (settled) return;
+          settled = true;
+          resolve();
+        };
+        const fail = (err) => {
+          if (settled) return;
+          settled = true;
+          reject(err);
+        };
+
         doc.html(host, {
           x: 0,
           y: 0,
           margin: [0, 0, 0, 0],
-          autoPaging: 'text',
+          autoPaging: 'slice',
+          width: doc.internal.pageSize.getWidth(),
+          windowWidth: renderWidthPx,
           html2canvas: {
-            scale: 0.9,
+            scale: 1,
             useCORS: true,
             allowTaint: true,
             backgroundColor: '#ffffff',
           },
-          callback: () => resolve(),
+          callback: () => done(),
         });
 
-        setTimeout(() => reject(new Error('Timed out while rendering HTML template to PDF.')), 60000);
+        setTimeout(() => fail(new Error('Timed out while rendering HTML template to PDF.')), 60000);
       });
     } finally {
       document.body.removeChild(host);
     }
 
     return doc.output('blob');
+  }
+
+  function _prepareTemplateForRender(templateHtml) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(templateHtml, 'text/html');
+
+    const styles = Array.from(doc.querySelectorAll('style'))
+      .map(el => el.textContent || '')
+      .join('\n');
+
+    return {
+      bodyHtml: doc.body ? doc.body.innerHTML : templateHtml,
+      styles,
+      dir: doc.documentElement?.getAttribute('dir') || doc.body?.getAttribute('dir') || '',
+      lang: doc.documentElement?.getAttribute('lang') || '',
+    };
+  }
+
+  async function _waitForImages(root) {
+    const images = Array.from(root.querySelectorAll('img'));
+    if (images.length === 0) return;
+
+    await Promise.all(images.map(img => {
+      if (img.complete) return Promise.resolve();
+      return new Promise(resolve => {
+        img.addEventListener('load', resolve, { once: true });
+        img.addEventListener('error', resolve, { once: true });
+      });
+    }));
   }
 
   function _getRenderWidthPx(opts) {
