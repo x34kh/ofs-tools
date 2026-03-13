@@ -70,55 +70,38 @@
         </div>
       </div>
 
-      <!-- Form Configuration -->
+      <!-- HTML Template -->
       <div class="card shadow-sm mb-3">
         <div class="card-header bg-light d-flex justify-content-between align-items-center">
           <h6 class="mb-0">
-            <i class="bi bi-braces me-2 text-primary"></i>Form Configuration
+            <i class="bi bi-filetype-html me-2 text-primary"></i>HTML Template
           </h6>
-          <button class="btn btn-sm btn-outline-secondary" id="loadExampleConfig">
-            <i class="bi bi-file-earmark-code me-1"></i>Load Example
-          </button>
         </div>
         <div class="card-body">
-          <label class="form-label small text-muted" for="formConfig">
-            JSON that defines which activity fields appear in the PDF
+          <label class="form-label small text-muted" for="templateFile">
+            Select an HTML template file (.html / .htm)
           </label>
-          <textarea class="form-control font-monospace" id="formConfig" rows="14"
-                    placeholder='{"title":"Activity Report","sections":[{"title":"Info","fields":[{"label":"Activity ID","property":"activityId"}]}]}'
-                    spellcheck="false"></textarea>
-          <div id="configError" class="text-danger small mt-1 d-none"></div>
+          <input class="form-control" type="file" id="templateFile" accept=".html,.htm,text/html" />
+          <div id="templateFileName" class="small text-muted mt-2">No file selected</div>
+          <div id="templateError" class="text-danger small mt-1 d-none"></div>
           <div class="mt-2">
-            <a class="small text-muted" data-bs-toggle="collapse" href="#configHelp"
+            <a class="small text-muted" data-bs-toggle="collapse" href="#templateHelp"
                role="button" aria-expanded="false">
-              <i class="bi bi-question-circle me-1"></i>Configuration schema reference
+              <i class="bi bi-question-circle me-1"></i>Template placeholder reference
             </a>
-            <div class="collapse mt-2" id="configHelp">
+            <div class="collapse mt-2" id="templateHelp">
               <div class="card card-body py-2 small text-muted">
-                <strong>Schema:</strong>
-                <pre class="mb-1 mt-1 small">{
-  "title": "Report Title",
-  "sections": [
-    {
-      "title": "Section Name",
-      "fields": [
-        {
-          "label":    "Label shown in PDF",
-          "property": "ofsFieldName",
-          "type":     "text | multiline | date"
-        }
-      ]
-    }
-  ]
-}</pre>
+                <strong>Placeholders:</strong>
+                <pre class="mb-1 mt-1 small">{{activity.activityId}}
+{{activity.customerName}}
+{{resource.pname}}
+{{signature}}
+{{tech_signature}}</pre>
                 <strong>Notes:</strong>
                 <ul class="mb-0 ps-3">
-                  <li>Use dot-notation for nested fields: <code>links.0.href</code></li>
-                  <li>OFS custom properties are prefixed <code>c_</code>, e.g. <code>c_myProp</code></li>
-                  <li>Common built-in fields: <code>activityId</code>, <code>status</code>,
-                    <code>date</code>, <code>duration</code>, <code>customerName</code>,
-                    <code>customerPhone</code>, <code>address</code>, <code>city</code>,
-                    <code>state</code>, <code>zip</code>, <code>activityNote</code></li>
+                  <li>Use dot-notation for nested properties, e.g. <code>{{activity.links.0.href}}</code>.</li>
+                  <li>Both <code>{{activity.fieldName}}</code> and <code>{{fieldName}}</code> are supported.</li>
+                  <li>For signatures/images, provide a value that your template can render in an <code>&lt;img src&gt;</code>.</li>
                 </ul>
               </div>
             </div>
@@ -149,17 +132,9 @@
               </select>
             </div>
           </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" id="skipEmptyFields" />
-            <label class="form-check-label small" for="skipEmptyFields">
-              Skip empty / null fields
-            </label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" id="onePerPage" checked />
-            <label class="form-check-label small" for="onePerPage">
-              One activity per page
-            </label>
+          <div class="small text-muted mt-2">
+            One PDF file is generated per activity. If multiple activities are provided,
+            files are bundled into a ZIP.
           </div>
         </div>
       </div>
@@ -219,7 +194,7 @@
 
             <div class="d-flex flex-wrap gap-2 mt-2">
               <button class="btn btn-success" id="downloadPdf">
-                <i class="bi bi-download me-2"></i>Download PDF
+                <i class="bi bi-download me-2"></i><span id="downloadLabel">Download PDF</span>
               </button>
               <button class="btn btn-outline-secondary" id="generateAgain">
                 <i class="bi bi-arrow-clockwise me-1"></i>Generate Again
@@ -258,6 +233,10 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"
         integrity="sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk"
         crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"
+  crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"
+  crossorigin="anonymous"></script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
         integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL"

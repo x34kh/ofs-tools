@@ -74,10 +74,9 @@ main {
 .cred-badge-ok   { background-color: #198754 !important; }
 .cred-badge-fail { background-color: #dc3545 !important; }
 
-/* ---- Form config textarea ---- */
-#formConfig {
-  resize: vertical;
-  min-height: 220px;
+/* ---- Template file helper text ---- */
+#templateFileName {
+  min-height: 1.2rem;
 }
 
 /* ---- Footer ---- */
