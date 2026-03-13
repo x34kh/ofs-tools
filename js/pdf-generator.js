@@ -292,17 +292,34 @@ const PDFGenerator = (() => {
 
     return normalized.replace(/{{\s*([^{}]+?)\s*}}/g, (_, expression) => {
       const key = expression.trim();
-      let value = _resolve(context, key);
-      if (value === undefined && key.startsWith('activity.')) {
-        value = _resolve(context.activity || {}, key.slice('activity.'.length));
-      }
-      if (value === undefined) {
-        value = _resolve(context.activity || {}, key);
-      }
+      const value = _resolveTemplateValue(context, key);
       if (value === undefined || value === null) return '';
       if (typeof value === 'object') return JSON.stringify(value);
       return String(value);
     });
+  }
+
+  function _resolveTemplateValue(context, key) {
+    let value = _resolveLoose(context, key);
+
+    if (value === undefined && key.startsWith('activity.')) {
+      value = _resolveLoose(context.activity || {}, key.slice('activity.'.length));
+    }
+
+    if (value === undefined && key.startsWith('resource.')) {
+      value = _resolveLoose(context.resource || {}, key.slice('resource.'.length));
+    }
+
+    // Backward-compatible shorthand: {{fieldName}} should look in activity first.
+    if (value === undefined && !key.includes('.')) {
+      value = _resolveLoose(context.activity || {}, key);
+    }
+
+    if (value === undefined && !key.includes('.')) {
+      value = _resolveLoose(context.resource || {}, key);
+    }
+
+    return value;
   }
 
   function _buildTemplateContext(activity) {
@@ -479,6 +496,52 @@ const PDFGenerator = (() => {
   function _resolve(obj, path) {
     if (!obj || !path) return undefined;
     return path.split('.').reduce((acc, key) => (acc != null ? acc[key] : undefined), obj);
+  }
+
+  function _resolveLoose(obj, path) {
+    if (!obj || !path) return undefined;
+    const parts = String(path).split('.');
+    let cur = obj;
+
+    for (const part of parts) {
+      if (cur == null) return undefined;
+
+      if (Array.isArray(cur) && /^\d+$/.test(part)) {
+        cur = cur[Number(part)];
+        continue;
+      }
+
+      if (typeof cur !== 'object') return undefined;
+
+      if (Object.prototype.hasOwnProperty.call(cur, part)) {
+        cur = cur[part];
+        continue;
+      }
+
+      const matchedKey = _findFlexibleKey(cur, part);
+      if (matchedKey === undefined) return undefined;
+      cur = cur[matchedKey];
+    }
+
+    return cur;
+  }
+
+  function _findFlexibleKey(obj, target) {
+    const keys = Object.keys(obj || {});
+    if (keys.length === 0) return undefined;
+
+    const lower = target.toLowerCase();
+    const normalized = _normalizeKey(target);
+
+    let found = keys.find(k => k.toLowerCase() === lower);
+    if (found !== undefined) return found;
+
+    found = keys.find(k => _normalizeKey(k) === normalized);
+    return found;
+  }
+
+  function _normalizeKey(key) {
+    return String(key).toLowerCase().replace(/[_\-\s]/g, '');
   }
 
   function _safeName(value) {
