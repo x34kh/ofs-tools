@@ -11,6 +11,22 @@
 const PDFGenerator = (() => {
   const EMPTY_PIXEL = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
 
+  // Legacy OFS placeholder aliases used in classic HTML templates.
+  const LEGACY_ACTIVITY_ALIASES = {
+    cname: ['customerName'],
+    caddress: ['address', 'streetAddress'],
+    customer_number: ['customerNumber'],
+    wo_account_name: ['customerName', 'accountName', 'woAccountName'],
+    reported_duration: ['reportedDuration', 'duration'],
+    XA_TIN_NUMBER: ['xaTinNumber', 'tinNumber', 'taxId'],
+    cphone: ['customerPhone', 'phone'],
+    cemail: ['customerEmail', 'email'],
+  };
+
+  const LEGACY_RESOURCE_ALIASES = {
+    pname: ['name', 'resourceName', 'displayName'],
+  };
+
   const PAGE_WIDTH_MM = {
     a4: 210,
     letter: 215.9,
@@ -323,13 +339,35 @@ const PDFGenerator = (() => {
   }
 
   function _buildTemplateContext(activity) {
+    const activityWithAliases = _withAliases(activity || {}, LEGACY_ACTIVITY_ALIASES);
+    const resourceBase = (activity && activity.resource) || {};
+    const resourceWithAliases = _withAliases(resourceBase, LEGACY_RESOURCE_ALIASES);
+
     return {
-      activity,
-      resource: activity.resource || {},
-      signature: activity.signature || activity.customerSignature || '',
-      tech_signature: activity.tech_signature || activity.technicianSignature || '',
-      reported_duration: activity.reported_duration || activity.duration || '',
+      activity: activityWithAliases,
+      resource: resourceWithAliases,
+      signature: activityWithAliases.signature || activityWithAliases.customerSignature || '',
+      tech_signature: activityWithAliases.tech_signature || activityWithAliases.technicianSignature || '',
+      reported_duration: activityWithAliases.reported_duration || activityWithAliases.duration || '',
     };
+  }
+
+  function _withAliases(source, aliasSpec) {
+    const out = { ...source };
+
+    for (const [alias, candidates] of Object.entries(aliasSpec || {})) {
+      if (out[alias] !== undefined && out[alias] !== null && out[alias] !== '') continue;
+
+      for (const candidate of candidates) {
+        const value = _resolveLoose(source, candidate);
+        if (value !== undefined && value !== null && value !== '') {
+          out[alias] = value;
+          break;
+        }
+      }
+    }
+
+    return out;
   }
 
   async function _renderHtmlToPdfBlob(html, opts) {
