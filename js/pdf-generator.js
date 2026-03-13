@@ -27,12 +27,14 @@ const PDFGenerator = (() => {
 
     const activityIdsEl = document.getElementById('activityIds');
     const templateFileEl = document.getElementById('templateFile');
+    const previewBtn = document.getElementById('previewFirst');
     const generateBtn = document.getElementById('generatePdf');
     const downloadBtn = document.getElementById('downloadPdf');
     const generateAgainBtn = document.getElementById('generateAgain');
 
     if (activityIdsEl) activityIdsEl.addEventListener('input', _updateCount);
     if (templateFileEl) templateFileEl.addEventListener('change', _onTemplateFileSelected);
+    if (previewBtn) previewBtn.addEventListener('click', _onPreviewFirst);
     if (generateBtn) generateBtn.addEventListener('click', _onGenerate);
     if (downloadBtn) downloadBtn.addEventListener('click', _download);
     if (generateAgainBtn) generateAgainBtn.addEventListener('click', () => _showPanel('previewEmpty'));
@@ -223,6 +225,52 @@ const PDFGenerator = (() => {
     }
   }
 
+  async function _onPreviewFirst() {
+    const ids = _getIds();
+    if (ids.length === 0) {
+      OFSApp.showToast('Enter at least one Activity ID.', 'warning');
+      return;
+    }
+
+    if (!_templateText.trim()) {
+      OFSApp.showToast('Select an HTML template file before previewing.', 'warning');
+      return;
+    }
+
+    const creds = OFSApp.getStoredCredentials();
+    if (!creds) {
+      OFSApp.showToast('OFS credentials are not set. Please configure them on the Home page.', 'danger');
+      return;
+    }
+
+    const previewBtn = document.getElementById('previewFirst');
+    if (previewBtn) previewBtn.disabled = true;
+
+    try {
+      const firstId = ids[0];
+      const activity = await OFSAPI.getActivity(creds, firstId);
+      const html = _fillTemplate(_templateText, _buildTemplateContext(activity));
+
+      const activityLabel = document.getElementById('previewActivityId');
+      if (activityLabel) activityLabel.textContent = `Activity ${firstId}`;
+
+      const frame = document.getElementById('previewFrame');
+      if (!frame) throw new Error('Preview frame is not available.');
+
+      // srcdoc gives immediate preview of the exact rendered template without download.
+      frame.srcdoc = html;
+
+      const modalEl = document.getElementById('previewModal');
+      if (!modalEl) throw new Error('Preview modal is not available.');
+      const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+      modal.show();
+    } catch (e) {
+      OFSApp.showToast(`Preview failed: ${e.message}`, 'danger');
+    } finally {
+      if (previewBtn) previewBtn.disabled = false;
+    }
+  }
+
   function _setDownloadLabel(text) {
     const label = document.getElementById('downloadLabel');
     if (label) label.textContent = text;
@@ -272,13 +320,12 @@ const PDFGenerator = (() => {
 
     const host = document.createElement('div');
     host.style.position = 'fixed';
-    host.style.left = '0';
+    host.style.left = '-10000px';
     host.style.top = '0';
     host.style.width = `${renderWidthPx}px`;
     host.style.background = '#ffffff';
-    host.style.opacity = '0';
     host.style.pointerEvents = 'none';
-    host.style.zIndex = '-1';
+    host.style.zIndex = '1';
     host.style.overflow = 'visible';
     host.setAttribute('dir', parsed.dir || 'ltr');
     host.setAttribute('lang', parsed.lang || 'en');

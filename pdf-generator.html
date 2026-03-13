@@ -140,6 +140,9 @@
       </div>
 
       <!-- Generate button -->
+      <button class="btn btn-outline-primary w-100 shadow-sm mb-2" id="previewFirst">
+        <i class="bi bi-eye me-2"></i>Preview First Activity
+      </button>
       <button class="btn btn-primary btn-lg w-100 shadow-sm" id="generatePdf">
         <i class="bi bi-file-earmark-pdf-fill me-2"></i>Generate PDF
       </button>
@@ -221,6 +224,24 @@
   </div><!-- /row -->
 </main>
 
+<!-- ============================================================ Preview Modal -->
+<div class="modal fade" id="previewModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="bi bi-eye me-2"></i>
+          Template Preview - <span id="previewActivityId">Activity</span>
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-0">
+        <iframe id="previewFrame" class="w-100 border-0" style="height:75vh"></iframe>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ================================================================ Footer -->
 <footer class="bg-light border-top py-3 mt-4">
   <div class="container text-center text-muted small">
@@ -243,7 +264,7 @@
         crossorigin="anonymous"></script>
 <script src="js/app.js"></script>
 <script src="js/ofs-api.js"></script>
-<script src="js/pdf-generator.js?v=20260313-2"></script>
+<script src="js/pdf-generator.js?v=20260313-3"></script>
 <script>
   document.addEventListener('DOMContentLoaded', () => {
     PDFGenerator.init();
