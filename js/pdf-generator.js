@@ -9,6 +9,8 @@
  * 5) If multiple PDFs are generated, they are packaged into a ZIP.
  */
 const PDFGenerator = (() => {
+  const EMPTY_PIXEL = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
+
   const PAGE_WIDTH_MM = {
     a4: 210,
     letter: 215.9,
@@ -283,6 +285,7 @@ const PDFGenerator = (() => {
 
     const styleTag = parsed.styles ? `<style>${parsed.styles}</style>` : '';
     host.innerHTML = `${styleTag}${parsed.bodyHtml}`;
+    _sanitizeTemplateDom(host);
     document.body.appendChild(host);
 
     try {
@@ -340,6 +343,27 @@ const PDFGenerator = (() => {
       dir: doc.documentElement?.getAttribute('dir') || doc.body?.getAttribute('dir') || '',
       lang: doc.documentElement?.getAttribute('lang') || '',
     };
+  }
+
+  function _sanitizeTemplateDom(root) {
+    const images = Array.from(root.querySelectorAll('img'));
+    for (const img of images) {
+      let src = (img.getAttribute('src') || '').trim();
+
+      // Resolve encoded braces that can appear in copied templates.
+      src = src.replace(/%7B%7B/g, '{{').replace(/%7D%7D/g, '}}');
+
+      const isUnresolvedPlaceholder = src.includes('{{') || src.includes('}}');
+      const isEmptyDataUri = /^data:image\/[a-zA-Z0-9.+-]+;base64,\s*$/i.test(src);
+
+      // Empty src resolves to current page URL, which causes html2canvas load errors.
+      if (!src || isUnresolvedPlaceholder || isEmptyDataUri) {
+        img.setAttribute('src', EMPTY_PIXEL);
+        continue;
+      }
+
+      img.setAttribute('src', src);
+    }
   }
 
   async function _waitForImages(root) {
