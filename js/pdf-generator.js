@@ -205,7 +205,11 @@ const PDFGenerator = (() => {
         if (!window.JSZip) throw new Error('JSZip library is not available.');
         const zip = new JSZip();
         for (const item of outputs) zip.file(item.fileName, item.blob);
-        _outputBlob = await zip.generateAsync({ type: 'blob' });
+        _outputBlob = await zip.generateAsync({
+          type: 'blob',
+          compression: 'DEFLATE',
+          compressionOptions: { level: 9 },
+        });
         _outputName = `ofs-activities-${new Date().toISOString().slice(0, 10)}.zip`;
         _outputType = 'zip';
         _setDownloadLabel('Download ZIP');
@@ -406,6 +410,7 @@ const PDFGenerator = (() => {
       orientation: opts.orient,
       unit: 'mm',
       format: opts.pageSize,
+      compress: true,
     });
 
     const pageW = doc.internal.pageSize.getWidth();
@@ -436,11 +441,12 @@ const PDFGenerator = (() => {
         sliceHeight
       );
 
-      const imgData = sliceCanvas.toDataURL('image/png');
+      // High-quality JPEG dramatically reduces PDF size while preserving visual fidelity.
+      const imgData = sliceCanvas.toDataURL('image/jpeg', 0.97);
       const imgH = (sliceHeight * pageW) / canvas.width;
 
       if (pageIndex > 0) doc.addPage();
-      doc.addImage(imgData, 'PNG', 0, 0, pageW, imgH);
+      doc.addImage(imgData, 'JPEG', 0, 0, pageW, imgH, undefined, 'MEDIUM');
 
       rendered += sliceHeight;
       pageIndex++;
