@@ -254,11 +254,19 @@ const PDFGenerator = (() => {
       const activityLabel = document.getElementById('previewActivityId');
       if (activityLabel) activityLabel.textContent = `Activity ${firstId}`;
 
-      const frame = document.getElementById('previewFrame');
-      if (!frame) throw new Error('Preview frame is not available.');
+      const previewHost = _createRenderHost(html, { pageSize: 'a4', orient: 'portrait' }, true);
+      const previewContainer = document.getElementById('previewContent');
+      if (!previewContainer) throw new Error('Preview container is not available.');
 
-      // srcdoc gives immediate preview of the exact rendered template without download.
-      frame.srcdoc = html;
+      previewContainer.innerHTML = '';
+      const inline = document.createElement('div');
+      inline.style.background = '#ffffff';
+      inline.style.boxShadow = '0 2px 12px rgba(0,0,0,.15)';
+      inline.style.margin = '0 auto';
+      inline.style.maxWidth = '900px';
+      inline.style.padding = '0';
+      inline.innerHTML = previewHost.innerHTML;
+      previewContainer.appendChild(inline);
 
       const modalEl = document.getElementById('previewModal');
       if (!modalEl) throw new Error('Preview modal is not available.');
@@ -308,6 +316,36 @@ const PDFGenerator = (() => {
   }
 
   async function _renderHtmlToPdfBlob(html, opts) {
+    if (!window.html2canvas) {
+      throw new Error('html2canvas library is not available.');
+    }
+
+    const host = _createRenderHost(html, opts, false);
+    document.body.appendChild(host);
+
+    try {
+      await _waitForImages(host);
+
+      const canvas = await window.html2canvas(host, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+        windowWidth: _getRenderWidthPx(opts),
+      });
+
+      if (!canvas.width || !canvas.height) {
+        throw new Error('Rendered canvas is empty.');
+      }
+
+      return _canvasToPdfBlob(canvas, opts);
+    } finally {
+      document.body.removeChild(host);
+    }
+  }
+
+  function _canvasToPdfBlob(canvas, opts) {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({
       orientation: opts.orient,
@@ -315,17 +353,63 @@ const PDFGenerator = (() => {
       format: opts.pageSize,
     });
 
+    const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
+    const pagePxHeight = Math.floor((canvas.width * pageH) / pageW);
+
+    if (pagePxHeight <= 0) throw new Error('Invalid page geometry for PDF rendering.');
+
+    let rendered = 0;
+    let pageIndex = 0;
+
+    while (rendered < canvas.height) {
+      const sliceHeight = Math.min(pagePxHeight, canvas.height - rendered);
+      const sliceCanvas = document.createElement('canvas');
+      sliceCanvas.width = canvas.width;
+      sliceCanvas.height = sliceHeight;
+
+      const ctx = sliceCanvas.getContext('2d');
+      ctx.drawImage(
+        canvas,
+        0,
+        rendered,
+        canvas.width,
+        sliceHeight,
+        0,
+        0,
+        canvas.width,
+        sliceHeight
+      );
+
+      const imgData = sliceCanvas.toDataURL('image/png');
+      const imgH = (sliceHeight * pageW) / canvas.width;
+
+      if (pageIndex > 0) doc.addPage();
+      doc.addImage(imgData, 'PNG', 0, 0, pageW, imgH);
+
+      rendered += sliceHeight;
+      pageIndex++;
+
+      // Safety cap to avoid runaway loops on malformed content.
+      if (pageIndex > 60) {
+        throw new Error('Template content exceeded maximum page limit (60).');
+      }
+    }
+
+    return doc.output('blob');
+  }
+
+  function _createRenderHost(html, opts, forPreview) {
     const renderWidthPx = _getRenderWidthPx(opts);
     const parsed = _prepareTemplateForRender(html);
 
     const host = document.createElement('div');
-    host.style.position = 'fixed';
-    host.style.left = '-10000px';
+    host.style.position = forPreview ? 'relative' : 'fixed';
+    host.style.left = forPreview ? '0' : '-10000px';
     host.style.top = '0';
     host.style.width = `${renderWidthPx}px`;
     host.style.background = '#ffffff';
     host.style.pointerEvents = 'none';
-    host.style.zIndex = '1';
     host.style.overflow = 'visible';
     host.setAttribute('dir', parsed.dir || 'ltr');
     host.setAttribute('lang', parsed.lang || 'en');
@@ -333,47 +417,7 @@ const PDFGenerator = (() => {
     const styleTag = parsed.styles ? `<style>${parsed.styles}</style>` : '';
     host.innerHTML = `${styleTag}${parsed.bodyHtml}`;
     _sanitizeTemplateDom(host);
-    document.body.appendChild(host);
-
-    try {
-      await _waitForImages(host);
-
-      await new Promise((resolve, reject) => {
-        let settled = false;
-        const done = () => {
-          if (settled) return;
-          settled = true;
-          resolve();
-        };
-        const fail = (err) => {
-          if (settled) return;
-          settled = true;
-          reject(err);
-        };
-
-        doc.html(host, {
-          x: 0,
-          y: 0,
-          margin: [0, 0, 0, 0],
-          autoPaging: 'slice',
-          width: doc.internal.pageSize.getWidth(),
-          windowWidth: renderWidthPx,
-          html2canvas: {
-            scale: 1,
-            useCORS: true,
-            allowTaint: true,
-            backgroundColor: '#ffffff',
-          },
-          callback: () => done(),
-        });
-
-        setTimeout(() => fail(new Error('Timed out while rendering HTML template to PDF.')), 60000);
-      });
-    } finally {
-      document.body.removeChild(host);
-    }
-
-    return doc.output('blob');
+    return host;
   }
 
   function _prepareTemplateForRender(templateHtml) {

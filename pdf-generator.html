@@ -236,7 +236,7 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body p-0">
-        <iframe id="previewFrame" class="w-100 border-0" style="height:75vh"></iframe>
+        <div id="previewContent" style="height:75vh; overflow:auto; background:#f8f9fa; padding:12px;"></div>
       </div>
     </div>
   </div>
@@ -264,7 +264,7 @@
         crossorigin="anonymous"></script>
 <script src="js/app.js"></script>
 <script src="js/ofs-api.js"></script>
-<script src="js/pdf-generator.js?v=20260313-3"></script>
+<script src="js/pdf-generator.js?v=20260313-4"></script>
 <script>
   document.addEventListener('DOMContentLoaded', () => {
     PDFGenerator.init();
