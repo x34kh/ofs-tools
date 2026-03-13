@@ -12,8 +12,15 @@ const OFSAPI = (() => {
 
   /* ---------- helpers ---------- */
 
+  function toBase64Utf8(value) {
+    const bytes = new TextEncoder().encode(value);
+    let binary = '';
+    for (const b of bytes) binary += String.fromCharCode(b);
+    return btoa(binary);
+  }
+
   function buildHeaders(creds) {
-    const encoded = btoa(unescape(encodeURIComponent(`${creds.user}:${creds.password}`)));
+    const encoded = toBase64Utf8(`${creds.user}:${creds.password}`);
     return {
       'Authorization': `Basic ${encoded}`,
       'Accept':        'application/json',
@@ -51,6 +58,7 @@ const OFSAPI = (() => {
         `(${networkErr.message})`
       );
       err.cors = true;
+      err.url = url;
       throw err;
     }
 
@@ -60,8 +68,9 @@ const OFSAPI = (() => {
         const body = await response.json();
         detail = body.detail || body.message || body.title || detail;
       } catch (_) { /* ignore JSON parse errors */ }
-      const err = new Error(detail);
+      const err = new Error(`HTTP ${response.status} ${response.statusText}: ${detail}`);
       err.status = response.status;
+      err.url = url;
       throw err;
     }
 
@@ -74,11 +83,11 @@ const OFSAPI = (() => {
 
   /**
    * Quick connectivity test.
-   * Attempts to list a single activity to verify the URL and credentials.
+   * Calls the OFS subscriptions list endpoint to verify URL and credentials.
+   * This endpoint is read-only and does not mutate OFS data.
    */
   async function testConnection(creds) {
-    // Use the activities collection endpoint with a minimal page size
-    await apiFetch(creds, '/rest/ofscCore/v1/activities?limit=1&offset=0');
+    await apiFetch(creds, '/rest/ofscCore/v1/events/subscriptions');
     return { message: 'Connection successful – OFS API is reachable.' };
   }
 

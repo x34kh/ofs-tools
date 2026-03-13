@@ -155,9 +155,20 @@ const OFSApp = (() => {
           ? '<br><small>This looks like a CORS error. The OFS instance must ' +
             'allow cross-origin requests from this page. See the README for details.</small>'
           : '';
+        const statusHint = e.status
+          ? `<br><small>HTTP status: ${escHtml(String(e.status))}</small>`
+          : '';
+        const endpointHint = e.url
+          ? `<br><small>Endpoint: ${escHtml(e.url)}</small>`
+          : '';
+        const authHint = e.status === 401
+          ? '<br><small>Authentication works in curl but fails in browser when an Origin header is present. ' +
+            'This usually means OFS origin-level security/CORS policy is rejecting browser-based Basic auth for this origin. ' +
+            'Try adding this exact site origin in OFS CORS settings or call OFS through a same-origin backend proxy.</small>'
+          : '';
         statusEl.innerHTML =
           `<div class="alert alert-danger py-2 mt-2 mb-0">
-            <i class="bi bi-x-circle-fill me-2"></i>${escHtml(e.message)}${corsHint}
+            <i class="bi bi-x-circle-fill me-2"></i>${escHtml(e.message)}${statusHint}${endpointHint}${authHint}${corsHint}
           </div>`;
       }
     }
